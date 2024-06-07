@@ -71,10 +71,11 @@ input_keep_cols=[
     'daterec',
     'datecol',
     'state_lab',
-    'spec_type',
-    'spec_type_oth',
+    'spectype2',
+    'specsite',
     'clin_summary',
-    'organization'
+    'organization',
+    'sex'
 ]
 input_final = input_df[input_keep_cols].sort_values('ID',ascending=False)
 #Clean Age
@@ -124,6 +125,9 @@ pdl_final = pdl_final.rename(columns={
     "toxigenic":"CDC_TOXIGENIC",
     "daterec":"CDC_DATEREC",
     "datecol":"CDC_DATECOL",
+    "sex":"CDC_SEX",
+    "spectype2":"CDC_SPECTYPE",
+    "specsite":"CDC_SPECSITE",
     "coryne_pen_int":"CDC_PEN",
     "coryne_mero_int":"CDC_MERO",
     "coryne_vanc_int":"CDC_VANC",
@@ -412,6 +416,11 @@ final_df.loc[final_df['cdcid1'].notna(),'system_source']='Lab Only'
 final_df.loc[final_df['EI_RecordID'].notna(),'system_source']='CCRF Only'
 final_df.loc[(final_df['EI_RecordID'].notna()) & (final_df['cdcid1'].notna()),'system_source']='Combined'
 
+#Add Integer Date Columns for PowerApps
+#(YEAR([date]) * 10000 + MONTH([date]) * 100 + DAY([date]))
+final_df['system_datecol'] = pd.to_datetime(final_df[['datecol1','CDC_DATECOL1']].bfill(axis=1).iloc[:,0]).dt.year*10000 + pd.to_datetime(final_df[['datecol1','CDC_DATECOL1']].bfill(axis=1).iloc[:,0]).dt.month*100 + pd.to_datetime(final_df[['datecol1','CDC_DATECOL1']].bfill(axis=1).iloc[:,0]).dt.day
+final_df['system_daterec'] = pd.to_datetime(final_df[['ReportDate','CDC_DATEREC1']].bfill(axis=1).iloc[:,0]).dt.year*10000 + pd.to_datetime(final_df[['ReportDate','CDC_DATEREC1']].bfill(axis=1).iloc[:,0]).dt.month*100 + pd.to_datetime(final_df[['ReportDate','CDC_DATEREC1']].bfill(axis=1).iloc[:,0]).dt.day
+
 #Mark Epi Duplicates
 final_df.loc[(final_df['RecordID'].duplicated(keep=False)) & (final_df['RecordID'].notna()) & (final_df['StateID'].notna()),'system_source']='Duplicated'
 # Mark Lab Duplicates
@@ -446,12 +455,11 @@ unmatch_lab_df = final_df[final_df['system_source']=='Lab Only'][[
     "acc_num1",	
     "age_lab1",	
     "age_units1",
-    ""
     "CDC_DATEREC1",	
     "CDC_DATECOL1",	
     "state_lab1",	
-    "spec_type1",	
-    "spec_type_oth1",	
+    "CDC_SPECTYPE1",	
+    "CDC_SPECSITE1",	
     "clin_summary1",	
     "organization1",
     "CDC_TOXIGENIC1"
@@ -460,8 +468,9 @@ dups_df = final_df[final_df['system_source']=='Duplicated']
 
 #Filter date and column criteria
 current_date = dt.datetime.now().date()
-date_cutoff = current_date+dt.timedelta(days=-30)
-unmatch_lab_df=unmatch_lab_df[(unmatch_lab_df['CDC_DATEREC1']>= date_cutoff) & (unmatch_lab_df['CDC_TOXIGENIC1'].notna())]
+#date_cutoff = current_date+dt.timedelta(days=-30)
+date_cutoff = dt.date(2024,1,1)
+unmatch_lab_df=unmatch_lab_df[(unmatch_lab_df['CDC_DATEREC1']>= date_cutoff) & (unmatch_lab_df['CDC_TOXIGENIC1'].notna())].drop(['CDC_TOXIGENIC1'], axis=1)
 
 
 
@@ -469,7 +478,6 @@ unmatch_lab_df=unmatch_lab_df[(unmatch_lab_df['CDC_DATEREC1']>= date_cutoff) & (
 # Create Quality File
 
 # %%
-#Should this be done every two weeks? Which day?
 import getpass
 user_name = getpass.getuser()
 base_path=r"C:\Users"
@@ -530,7 +538,7 @@ def send_outlook_html_mail(recipients, attachment, subject='No Subject', body='B
 MAIL_SUBJECT = f"Diphtheria Surveillance Quality Report {current_date.strftime('%d%b%Y')}"
 
 # Hard coded email HTML text
-MAIL_BODY_FINAL ="""<html><body><p>Please see attached today's Diptheria Surveillance Quality Report</p>"""
+MAIL_BODY_FINAL ="""<html><body><p>Please see attached today's Diphtheria Surveillance Quality Report</p>"""
 
 recipient_list = ['oqk3@cdc.gov']
 copies_list = ['orv2@cdc.gov']
