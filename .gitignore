@@ -1,3 +1,7 @@
 ccrf.csv
 lengths_check.csv
 test_merge2.csv
+keys.py
+__pycache__/keys.cpython-310.pyc
+__pycache__/module_test.cpython-310.pyc
+.gitignore

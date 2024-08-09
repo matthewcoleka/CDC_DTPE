@@ -55,7 +55,7 @@ pd.set_option('display.max_columns', 500)
 # %%
 #PDL Data Clean
 #Select All PC IDs, add metadata
-input_query = "SELECT * FROM INPUT WHERE country ='United States' and ID like 'PC%'"
+input_query = "SELECT * FROM INPUT WHERE country ='United States' and CDCID like 'PC%' and human ='1'"
 input_df = pd.read_sql_query(input_query, pdl_engine)
 coryne_df = pd.read_sql_table('coryne', pdl_engine)
 coryne_ast_df = pd.read_sql_table('coryne_ast', pdl_engine)
@@ -64,7 +64,7 @@ coryne_ast_df = pd.read_sql_table('coryne_ast', pdl_engine)
 #Clean Input
 #input_df.columns
 input_keep_cols=[
-    'ID',
+    'CDCID',
     'acc_num',
     'age_lab',
     'age_units',
@@ -77,9 +77,10 @@ input_keep_cols=[
     'organization',
     'sex'
 ]
-input_final = input_df[input_keep_cols].sort_values('ID',ascending=False)
+input_final = input_df[input_keep_cols].sort_values('CDCID',ascending=False)
 #Clean Age
 input_final.loc[:,'age_lab'] = pd.to_numeric(input_final['age_lab'], errors='coerce').astype('float')
+input_final=input_final.rename({'CDCID':'CDCID_Input'},axis=1)
 #input_final.head()
 
 # %%
@@ -115,10 +116,10 @@ coryne_final = pd.merge(left = coryne_clean, right=coryne_ast_df[ast_keep_cols],
 
 # %%
 #Merge Lab Data
-pdl_df= pd.merge(left=input_final, right=coryne_final, left_on='ID',right_on='cdcid',how='left')
-pdl_final= pdl_df.drop(['cdcid'],axis=1).rename({'ID':'cdcid'},axis=1)
+pdl_df= pd.merge(left=input_final, right=coryne_final, left_on='CDCID_Input',right_on='cdcid',how='left')
+
 #Rename Cols
-pdl_final = pdl_final.rename(columns={
+pdl_final = pdl_df.drop(['CDCID_Input'],axis=1).rename(columns={
     "cryne_ov_interp":"CDC_CULT",
     "coryne_pcr_interp":"CDC_PCR",
     "biotype":"CDC_BIOTYPE",
@@ -468,8 +469,8 @@ dups_df = final_df[final_df['system_source']=='Duplicated']
 
 #Filter date and column criteria
 current_date = dt.datetime.now().date()
-#date_cutoff = current_date+dt.timedelta(days=-30)
-date_cutoff = dt.date(2024,1,1)
+date_cutoff = current_date+dt.timedelta(days=-30)
+#date_cutoff = dt.date(2024,1,1)
 unmatch_lab_df=unmatch_lab_df[(unmatch_lab_df['CDC_DATEREC1']>= date_cutoff) & (unmatch_lab_df['CDC_TOXIGENIC1'].notna())].drop(['CDC_TOXIGENIC1'], axis=1)
 
 
@@ -540,7 +541,7 @@ MAIL_SUBJECT = f"Diphtheria Surveillance Quality Report {current_date.strftime('
 # Hard coded email HTML text
 MAIL_BODY_FINAL ="""<html><body><p>Please see attached today's Diphtheria Surveillance Quality Report</p>"""
 
-recipient_list = ['oqk3@cdc.gov']
+recipient_list = ['oqk3@cdc.gov','trj9@cdc.gov']
 copies_list = ['orv2@cdc.gov']
 
 #Use integer division to get week number
@@ -565,5 +566,8 @@ with pdl_engine.begin() as conn:
     conn.execute(stmt)
 #How to handle historic data?
 final_df.to_sql("CCRF", pdl_engine, if_exists='append',index=False, chunksize=75, method=None)
+
+# %%
+
 
 
