@@ -469,7 +469,7 @@ dups_df = final_df[final_df['system_source']=='Duplicated']
 
 #Filter date and column criteria
 current_date = dt.datetime.now().date()
-date_cutoff = current_date+dt.timedelta(days=-30)
+date_cutoff = current_date+dt.timedelta(days=-60)
 #date_cutoff = dt.date(2024,1,1)
 unmatch_lab_df=unmatch_lab_df[(unmatch_lab_df['CDC_DATEREC1']>= date_cutoff) & (unmatch_lab_df['CDC_TOXIGENIC1'].notna())].drop(['CDC_TOXIGENIC1'], axis=1)
 
