@@ -43,16 +43,6 @@ ccrf_tbl = db.Table(
 # )
 
 # %%
-#Pull in CCRF data
-conn.request("POST", "/api/SurveyData/GetSurveyData?surveyid=0c8b2402-03a4-4599-824c-2bd3a0fe6ab6", headers=headers)
-
-res = conn.getresponse()
-r = res.read()
-data=json.loads(r.decode("utf-8"))
-ccrf_raw=pd.DataFrame(data)
-pd.set_option('display.max_columns', 500)
-
-# %%
 #PDL Data Clean
 #Select All PC IDs, add metadata
 input_query = "SELECT * FROM INPUT WHERE country ='United States' and CDCID like 'PC%' and human ='1'"
@@ -146,6 +136,29 @@ pdl_final = pdl_df.drop(['CDCID_Input'],axis=1).rename(columns={
 #pdl_final.head()
 
 # %% [markdown]
+# Epi Info Data
+
+# %%
+#Pull in CCRF data
+conn.request("POST", "/api/SurveyData/GetSurveyData?surveyid=0c8b2402-03a4-4599-824c-2bd3a0fe6ab6", headers=headers)
+
+res = conn.getresponse()
+r = res.read()
+data=json.loads(r.decode("utf-8"))
+ccrf_raw=pd.DataFrame(data)
+pd.set_option('display.max_columns', 500)
+
+# %% [markdown]
+# Historic Data
+
+# %%
+#Pull in Historic Diphtheria Data
+hist_path = r"C:\Users\orv2\CDC\NCIRD-MVPDB-DTP-EPI - Documents\Diphtheria\Surveillance\Data Management\Historic"
+hist_raw = pd.read_excel(hist_path+"\Historic_Coryne.xlsx",sheet_name="HIST_CLEAN")
+#Concatenate with CCRF data
+ccrf_raw = pd.concat([ccrf_raw, hist_raw], ignore_index=True)
+
+# %% [markdown]
 #  Clean CCRF - Remove dummy data (GAEXAMPLE), empty responses (state is null), records marked for removal (stateid = DELETE)
 
 # %%
@@ -182,12 +195,19 @@ dups_to_drop = ccrf_df[(ccrf_df['RecordID'].isin(dups)) & (ccrf_df['EI_Status']!
 # Drop incomplete dup records   
 ccrf_df_final = ccrf_df[~ccrf_df['EI_RecordID'].isin(dups_to_drop)]
 
+# %% [markdown]
+# Clean CCRF - String
+
 # %%
-#Clean Variable Types
-#Booleans
+string_cols = ['sphlid1','sphlid2','sphlid3']
+ccrf_df_final.loc[:,string_cols] = ccrf_df_final[string_cols].astype(str)
+
+# %% [markdown]
+# Clean CCRF - Booleans
+
+# %%
 bool_cols = ccrf_df_final.select_dtypes(bool).columns
 ccrf_df_final.loc[:,bool_cols] = ccrf_df_final[bool_cols].astype("Int64")
-
 
 # %% [markdown]
 # Dates
@@ -303,7 +323,8 @@ ccrf_df_final.loc[:,'Travel1'] = ccrf_df_final['Travel1'].map({
 ccrf_df_final.loc[:,'EI_Status'] = ccrf_df_final['EI_Status'].map({
     "Complete":1,
     "In Process":2,
-    "In Progress (URL)":3
+    "In Progress (URL)":3,
+    "Historic": 4
 }).astype("Int64")
 
 # %% [markdown]
@@ -469,7 +490,7 @@ dups_df = final_df[final_df['system_source']=='Duplicated']
 
 #Filter date and column criteria
 current_date = dt.datetime.now().date()
-date_cutoff = current_date+dt.timedelta(days=-60)
+date_cutoff = current_date+dt.timedelta(days=-30)
 #date_cutoff = dt.date(2024,1,1)
 unmatch_lab_df=unmatch_lab_df[(unmatch_lab_df['CDC_DATEREC1']>= date_cutoff) & (unmatch_lab_df['CDC_TOXIGENIC1'].notna())].drop(['CDC_TOXIGENIC1'], axis=1)
 
@@ -541,7 +562,7 @@ MAIL_SUBJECT = f"Diphtheria Surveillance Quality Report {current_date.strftime('
 # Hard coded email HTML text
 MAIL_BODY_FINAL ="""<html><body><p>Please see attached today's Diphtheria Surveillance Quality Report</p>"""
 
-recipient_list = ['oqk3@cdc.gov','trj9@cdc.gov']
+recipient_list = ['trj9@cdc.gov']
 copies_list = ['orv2@cdc.gov']
 
 #Use integer division to get week number
@@ -566,8 +587,5 @@ with pdl_engine.begin() as conn:
     conn.execute(stmt)
 #How to handle historic data?
 final_df.to_sql("CCRF", pdl_engine, if_exists='append',index=False, chunksize=75, method=None)
-
-# %%
-
 
 
